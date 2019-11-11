@@ -1,0 +1,18 @@
+
+export(checkCountsFormat)
+export(allArrangements)
+export(GOF)
+export(mcmc)
+
+export(gammaLogMLE)
+export(gammaMLparameters)
+
+export(ageClassLogMLE)
+export(ageClassMLparameters)
+
+importFrom(dplyr, distinct)
+importFrom(combinat, xsimplex)
+importFrom(DEoptimR, JDEoptim)
+importFrom(LaplacesDemon, rdirichlet)
+importFrom(graphics, hist, par, plot)
+importFrom(stats, chisq.test, rnorm, runif, pgamma, dmultinom)

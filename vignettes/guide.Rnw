@@ -1,0 +1,264 @@
+\documentclass{article}
+%\VignetteEngine{knitr::knitr}
+%\VignetteIndexEntry{Guide to using GammaModel}
+\usepackage{geometry}
+\usepackage{float}
+\geometry{verbose,tmargin=3cm,bmargin=3cm,lmargin=2cm,rmargin=2cm}
+\floatplacement{figure}{H}
+\begin{document}
+<<setup, include=FALSE, cache=FALSE>>=
+library(knitr)
+opts_chunk$set(fig.pos='H', comment=NA)
+@
+\title{Using the 'GammaModel' package to model age-at-death counts using the Gamma distribution}
+\author{Adrian Timpson}
+\maketitle
+
+This vignette provides a guide to using the R package GammaModel, which was created to perform the analysis in the paper 'Modelling caprine age-at-death profiles using the Gamma distribution', JAS 2018, A. Timpson et al. It assumes the user has some basic familiarity with programming in R.
+
+\section{Installation}
+The GammaModel package can be installed directly from GitHub, using the 'devtools' package on the CRAN. Invoke R then install and load devtools by typing:
+<<install1, eval=FALSE>>=
+install.packages('devtools')
+library(devtools)
+@
+The GammaModel package can then be installed and loaded, and a summary of the available help files and data sets included in the package can be browsed:
+<<install2, eval=FALSE>>=
+install_github('UCL/GammaModel')
+library(GammaModel)
+help(GammaModel)
+@
+
+\section{Age-at-death data}
+Age-at-death data are typically integer counts of teeth that fall into discrete age classes. However, due to varying archaeological preservation the age of some samples are less precise and therefore are assigned to several possible age classes. An age-at-death dataset of 10 European Neolithic sites can be loaded and inspected by typing:
+<<data1, eval=TRUE>>=
+library(GammaModel)
+data(Neolithic)
+print(Neolithic)
+@
+Further information about the dataset can be found by typing:
+<<data2, eval=FALSE>>=
+help(Neolithic)
+@
+Notice for example site 'PPI' has two counts in the multi-class BC. Crucially, this is not equivalent to 1 count in B and 1 count in C. Instead, BC=2 is equivalent to (B=1 and C=1) or (B=2 and C=0) or (B=0 and C=2).  Therefore a key component in calculating the probability of the data given any proposed model is to first generate all possible arrangements of the age-at-death counts, using the allArrangements() function. Notice counts in classes E and F are automatically combined into a multi-class EF, since there were no counts in the raw data that were assigned to only E or F. 
+<<data3, eval=TRUE>>=
+library(GammaModel)
+data(Neolithic)
+counts <- Neolithic['PPI',]
+aa <- allArrangements(counts)
+print(aa)
+@
+
+The number of combinations can become huge if there are many multi-class assignments, which can generate large memory demands:
+<<data4, eval=TRUE>>=
+library(GammaModel)
+data(Neolithic)
+counts <- Neolithic['TRA2',]
+x <- allArrangements(counts) 
+print(counts)
+print(nrow(x))
+@
+
+\section{Goodness of Fit (GOF)}
+The GammaModel package also provides several age-class models, each of which is described by the probability of death occuring in age classes A to I: 
+
+<<gof1, echo=FALSE, eval=TRUE>>=
+tab <- data.frame(Class=LETTERS[1:9],
+	age=c('0 to 2 months',
+		'2 to 6 months',
+		'6 to 12 months',
+		'1 to 2 years',
+		'2 to 3 years',
+		'3 to 4 years',
+		'4 to 6 years',
+		'6 to 8 years',
+		'8 years or more'))
+print(tab, row.names=F)
+@
+
+These models can be loaded and viewed as follows:
+<<gof2, eval=TRUE>>=
+# payne models
+data(models.payne)
+print(models.payne)
+
+# redding models
+data(models.redding)
+print(models.redding)
+@
+
+Further information about these model probabilities can be found by typing:
+<<gof3, eval=FALSE>>=
+help(models.payne)
+help(models.redding)
+@
+
+A Goodness of Fit test (GOF) evaluates how typical some observed data (or more extreme) is under a particular model. This can be achieved using the GOF() function as follows:
+<<gof4, eval=FALSE>>=
+data(Neolithic)
+data(models.payne)
+counts <- Neolithic['FON1',] 
+model <- models.payne['meat',]
+GOF(counts, model)
+@
+
+P-values are estimated by sampling 10,000 arrangements of the data, but for improved precision this default N argument value may be increased:
+<<gof5, eval=FALSE>>=
+GOF(counts, model, N = 20000)
+@
+
+\section{Maximum Likelihood}
+Both the Maximum Likelihood Estimates (MLE) and the Maximum Likelihood parameter values can be calculated for either the Gamma model or the age-class model, for some given count data. Both require a search of parameter space, and this is achieved using a Differential Evolution stochastic algorithm for the Gamma model, and a Random Search algorithm for the age-class model.
+
+\subsection{Age-class Maximum Likelihood}
+Notice in the example below, the most likely probability for age-class HI = 0 (to 4 d.p), despite the data having a count in multi-class EFGHI (which could come from HI). This illustrates the interactive influence of data in other age-classes. For example, the large number of counts in classes EF and G (12 and 10 respectively) mean that the single count in EFGHI is far more likely to have come from EF or G than from HI.
+<<acml1, eval=TRUE>>=
+data(Neolithic)
+counts <- Neolithic['TRA1',]
+MLpar <- ageClassMLparameters(counts)
+MLE <- ageClassLogMLE(counts)
+print(counts) # raw data
+print(MLpar) # most likely model parameters (probabilities)
+print(MLE) # log maximum likelihood estimate
+@
+
+\subsection{Gamma Maximum Likelihood}
+Maximum Likelihood Gamma parameters 'shape' and 'mean' can be found as follows:
+
+<<gml1,eval=TRUE,cache=TRUE>>=
+data(Neolithic)
+counts <- Neolithic['TRA1',]
+MLpar <- gammaMLparameters(counts)
+MLE <- gammaLogMLE(counts)
+print(MLpar) # most likely model parameters
+print(MLE) # log maximum likelihood estimate
+
+# find ML parameters for three datasets
+p1 <- gammaMLparameters(Neolithic['TRA1',])
+p2 <- gammaMLparameters(Neolithic['TES',])
+p3 <- gammaMLparameters(Neolithic['WIK',])
+@
+
+These can then be used to plot the full Gamma distribution using the dgamma() function. Notice this function requires 'shape' and 'rate' parameters, where rate = shape/mean.  
+
+\begin{figure}
+<<gml2,eval=TRUE,cache=TRUE,dependson='gml1',fig.width=6,fig.height=4>>=
+
+# x-axis to cover 10 years
+x <- seq(0,10,length.out=1000) 
+
+# full Gamma distributions
+y1 <- dgamma(x, p1$shape, p1$shape/p1$mean)
+y2 <- dgamma(x, p2$shape, p2$shape/p2$mean)
+y3 <- dgamma(x, p3$shape, p3$shape/p3$mean)
+
+plot(NULL,xlim=c(0,10),ylim=c(0,0.4),xlab='age', ylab='probability density')
+lines(x,y1,col=1,lwd=2)
+lines(x,y2,col=2,lwd=2)
+lines(x,y3,col=3,lwd=2)
+
+# legend
+legend(x=8, y=0.3, bty='n', col=1:3, lwd=2, legend= c('TRA1','TES','WIK'))
+@
+\end{figure}
+
+\section{Gamma likelihood distribution}
+We can find the full joint likelihood distribution of the Gamma parameters 'shape' and 'mean' via Markov Chain Monte Carlo (MCMC), using the function mcmc(), to show the full uncertainty due to small sample sizes and multi-class assignments.  By default, mcmc() will output a progress update for each 20 percent completion. At completion the Acceptance Rate is printed, and the full MCMC chain is plotted.  Together these allow the user to check the chain is well mixed, and a 'hairy catepillar' appearance togther with an acceptance rate of around 0.4 suggests an efficient search.   Otherwise, the total number of iterations can be increased from the default argument N =30,000, and the default prop = 0.4 can be reduced, ensuring smaller average jumps by the proposal function.
+
+\begin{figure}
+<<mcmc1,eval=TRUE,cache=TRUE>>=
+data(Neolithic) # load data
+counts <- Neolithic['TRA1',]
+pars <- mcmc(counts) # generate a MCMC chain
+@
+\end{figure}
+
+Each row of the returned data frame is a sample from the joint likelihood distribution, after burnin and thinning. This can be graphically represented in various ways. 
+\begin{figure}
+<<mcmc2,eval=TRUE,cache=TRUE,dependson='mcmc1',fig.width=5,fig.height=5>>=
+
+# plot the MCMC chain output
+plot(pars, pch='+', cex = 0.5)
+
+# Add contour lines by first generating 2D kernels
+# Requires the ks package
+library(ks) 
+H <- matrix(c(0.012, 0, 0, 0.012), 2, 2)
+fhat <- kde(x=pars, H=H)
+plot(fhat, drawlabels=T, lwd=2, lty=1, add=T, col='red')
+@
+\end{figure}
+
+Each sample from the MCMC chain is a pair of Gamma parameters that can be used to construct the full Gamma distribution, thus representing the uncertainty in the distribution directly, rather than via a graphic representation of the underlying parameters.
+
+\begin{figure}
+<<mcmc3,eval=TRUE,cache=TRUE,dependson='mcmc1',fig.width=6,fig.height=4>>=
+# calculate the 'rate' parameter for each sample
+pars$rate <- pars$shape / pars$mean
+
+# generate an age range of interest
+x <- seq(0,5,length.out=1000)
+
+# start with a blank plot
+plot(NULL, xlim=c(0,5), ylim=c(0,0.5), xlab='age', ylab='PD', main='TRA1')
+
+# add 2000 samples from the chain
+library(scales) # alpha function for transparency 
+for(n in 1:2000){
+	y <- dgamma(x, shape=pars$shape[n], rate=pars$rate[n])
+	lines(x,y,col=alpha('black',alpha=0.04))
+	}
+@
+\end{figure}
+
+\section{Summary statistics and their Confidence Intervals}
+
+Useful summary statistics and their confidence intervals (CI) can be derived from the MCMC chain output.  The ML of the 'mean' parameter may be directly interpreted as the mean slaughter age of the herd. The MCMC chain of values are normally distributed (a consequence of the central limit theorem) and therefore the CI may be found using quantiles.  The mode can be interpreted as the most likely slaughter age, and calculated exactly using the ML parameters mean (mu) and shape (k) as follows: mode = (k - 1)(mu / k). Mathematically the mode is not defined for k smaller than 1 since the probability density function (PDF) = zero when age = 0. However the PDF asymptotically increases as the age approaches zero so for real data this constraint is irrelevant, and such distributions can be described as having a peak kill age of 'new-born'. In the same way, the mode can be calculated for each sample from the MCMC chain. These are not normally distributed so CI are calculated from the Highest Density Interval (HDI) using the p.interval() function in the LaplacesDemon package.  Finally, the age range covering the majority of slaughters is typically skewed, often bounded by zero (e.g. site FON1). This can calculated from the 50 percent HDI, again using the p.interval() function from LaplacesDemon.
+
+<<mcmc4,eval=TRUE,cache=TRUE,dependson='mcmc1'>>=
+#------------------------------------------------------------
+# mean slaughter age
+#------------------------------------------------------------
+# Maximum Likelihood
+MLpar$mean
+
+#95% CI
+quantile(pars$mean, c(0.025, 0.975))
+
+#------------------------------------------------------------
+# mode slaughter age (peak / most common)
+#------------------------------------------------------------
+# Maximum Likelihood
+mode <- (MLpar$shape - 1) * (MLpar$mean / MLpar$shape)
+
+# constrain to age zero
+if(mode < 0) mode <- 0
+print(mode)
+
+# 95% CI
+# first calculate the mode for each sample of the chain
+pars$mode <- (pars$shape - 1) * (pars$mean / pars$shape)
+
+# constrain to age zero
+pars$mode[pars$mode < 0] <- 0 
+
+# finally the 95% HDI
+library(LaplacesDemon)
+p.interval(pars$mode, prob = 0.95)
+
+#------------------------------------------------------------
+# Age range covering the majority of slaughters
+#------------------------------------------------------------
+# rgamma() requires shape and rate parameters
+MLpar$rate <- MLpar$shape / MLpar$mean
+
+# generate random samples from the distribution
+rg <- rgamma(1000000, shape = MLpar$shape, rate = MLpar$rate)
+
+# find the 50% HDI range
+p.interval(rg, prob = 0.5)
+@
+
+Note, the values output above are the result of one MCMC chain, and with therefore differ slightly if the mcmc() function is re-run. For improved accuracy longer or multiple chains are recommended.
+
+\end{document}
