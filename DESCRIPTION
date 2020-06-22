@@ -1,6 +1,7 @@
 Package: GammaModel
 Title: Modelling age-at-death profiles using the Gamma distribution
 Version: 1.0
+Date: 2018
 Authors@R: person("Adrian", "Timpson", email = "a.timpson@ucl.ac.uk", role = c("aut", "cre"))
 Maintainer: Adrian Timpson <a.timpson@ucl.ac.uk>
 Description: Tools to model age-at-death count data using the Gamma distribution.  Accompanies 'Modelling caprine age-at-death profiles using the Gamma distribution' by Adrian Timpson, Rosalind E. Gillis, Katie Manning and Mark G. Thomas. Journal of Archaeological Science 2018. 
